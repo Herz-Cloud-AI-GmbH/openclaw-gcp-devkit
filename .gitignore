@@ -1,0 +1,40 @@
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/*.tfplan
+terraform/tfplan.out
+terraform/*.tfvars
+terraform/sa-key.json
+
+# Environment and secrets
+**.local/
+**/.env
+*.pem
+*.key
+sa-key.json
+
+# gcloud credentials (project-scoped, wiped on container rebuild)
+.devcontainer/.gcloud/*
+!.devcontainer/.gcloud/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Agent secrets and workspace data
+agents/*/.env
+agents/*/workspace/*
+!agents/*/workspace/.gitkeep
+!agents/*/workspace/*-example*
+!agents/*/workspace/*.md
+
+# Temporary
+tmp/
+*.tmp
+*.log

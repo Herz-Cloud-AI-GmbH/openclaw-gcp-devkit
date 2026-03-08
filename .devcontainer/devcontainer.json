@@ -1,0 +1,82 @@
+{
+  "name": "OpenClaw on GCP",
+  // Use Dockerfile for build
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "..",
+    // Build-time environment vars
+    "args": {
+      "APP_FOLDER": "/workspaces/${localWorkspaceFolderBasename}",
+      "TERRAFORM_VERSION": "1.14.6"
+    }
+  },
+  "runArgs": [
+    "--env-file",
+    ".devcontainer/.env"
+  ],
+  "forwardPorts": [
+    18789
+  ],
+  "remoteUser": "vscode",
+  // Add mounts
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind",
+    "source=./.devcontainer/.gcloud,target=/home/vscode/.config/gcloud,type=bind"
+  ],
+  // Post-create setup instructions
+  "postCreateCommand": {
+    "addSafeRepository": "git config --global --add safe.directory /workspaces/${localWorkspaceFolderBasename}",
+    "showInstructions": "echo '\n🚀 Welcome to OpenClaw on GCP!\n\nRun: make auth       # Authenticate gcloud (required after rebuild)\n     make check      # Verify prerequisites\n     make tf-init    # Initialize Terraform\n     make tf-plan    # Preview changes\n     make tf-apply   # Deploy to GCP\n\nFor help: make help\n'"
+  },
+  // Customize the devcontainer
+  "customizations": {
+    "vscode": {
+      // Add all required extensions
+      "extensions": [
+        // Terraform
+        "hashicorp.terraform",
+        // makefile tools
+        "ms-vscode.makefile-tools",
+        // Docker
+        "ms-azuretools.vscode-docker",
+        // YAML
+        "redhat.vscode-yaml",
+        // Git
+        "mhutchie.git-graph",
+        // Spell checker
+        "streetsidesoftware.code-spell-checker"
+      ],
+      "settings": {
+        "workbench.colorCustomizations": {
+          // title bar coloring
+          "titleBar.activeBackground": "#e16277",
+          "titleBar.activeForeground": "#000000",
+          "titleBar.inactiveBackground": "#e16277",
+          "titleBar.inactiveForeground": "#2c2c2c",
+          // left side bar coloring
+          "activityBar.activeBackground": "#af6d78",
+          "activityBar.background": "#e16277",
+          "activityBar.foreground": "#000000",
+          "activityBar.inactiveForeground": "#2c2c2c",
+          "activityBarBadge.background": "#eecb9d",
+          "activityBarBadge.foreground": "#15202b",
+          "commandCenter.border": "#15202b99",
+          "sash.hoverBorder": "#ecfbf5",
+          // footer coloring
+          "statusBar.background": "#e16277",
+          "statusBar.foreground": "#000000",
+          "statusBarItem.hoverBackground": "#e16277",
+          "statusBarItem.remoteBackground": "#e16277",
+          "statusBarItem.remoteForeground": "#000000"
+        },
+        // Editor settings
+        "editor.formatOnSave": true,
+        // Stop auto-forwarding ports
+        "remote.autoForwardPorts": false,
+        // File settings
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true
+      }
+    }
+  }
+}

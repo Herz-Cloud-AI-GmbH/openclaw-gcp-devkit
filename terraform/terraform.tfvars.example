@@ -1,0 +1,13 @@
+# Example terraform.tfvars — copy and customize
+# project_id   = "my-gcp-project-id"
+# region       = "europe-west1"
+# zone         = "europe-west1-b"
+# instance_name = "openclaw-gateway"
+# machine_type = "e2-medium"
+# disk_size_gb = 20
+
+# --- Optional: auto start/stop schedule (saves ~60% on compute) ---
+# vm_schedule_enabled  = true
+# vm_schedule_timezone = "Europe/Berlin"
+# vm_schedule_start    = "0 8 * * 1-5"   # 08:00 weekdays
+# vm_schedule_stop     = "0 22 * * *"     # 22:00 every day

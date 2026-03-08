@@ -1,0 +1,3 @@
+# During `git merge` (e.g. devkit-pull), always keep the local agents/ folder.
+# This prevents any devkit community changes from overwriting private agent configs.
+agents/** merge=ours

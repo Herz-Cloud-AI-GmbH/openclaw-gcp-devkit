@@ -1,0 +1,21 @@
+{
+  "id": "johndoe",
+  "identity": {
+    "name": "John Doe",
+    "emoji": "🤖",
+    "theme": "helpful-assistant"
+  },
+  "model": {
+    "primary": "anthropic/claude-sonnet-4-5"
+  },
+  "whatsapp": {
+    "account": "johndoe",
+    "dmPolicy": "allowlist",
+    "groupPolicy": "allowlist",
+    "selfChatMode": true,
+    "groupChat": {
+      "mentionPatterns": ["JohnDoe", "@JohnDoe", "John"]
+    }
+  },
+  "bindings": []
+}

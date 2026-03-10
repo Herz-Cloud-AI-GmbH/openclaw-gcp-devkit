@@ -6,7 +6,7 @@ Per-agent configuration: each agent in `agents/<id>/` has its own WhatsApp accou
 ## Structure
 
 - `terraform/` — IaC: main.tf, compute.tf, network.tf, iam.tf, schedule.tf, variables.tf, outputs.tf
-- `scripts/` — startup.sh, check-prerequisites.sh, setup-providers.sh, validate-agents.sh, deploy-agents.sh
+- `scripts/` — startup.sh (Docker only, runs once), provision.sh (Python/tooling, idempotent via `make vm-provision`), check-prerequisites.sh, setup-providers.sh, validate-agents.sh, deploy-agents.sh
 - `config/` — env.template (gateway-level LLM API keys only)
 - `agents/` — Per-agent definitions (agent.json, SOUL.md, IDENTITY.md, env.template, workspace/)
 - `tests/` — test_terraform_validate.sh, test_scripts.sh, test_agents.sh
@@ -29,10 +29,12 @@ make vm-tunnel                               # IAP tunnel → localhost:18789
 make oc-cli                                  # interactive TUI terminal chat
 make oc-status / oc-logs / oc-restart        # container management
 make oc-update                               # update to latest image + doctor --fix + redeploy agents
+make vm-provision                            # install/update Python venv + agent tooling on VM (idempotent)
 make oc-upload-env ENV_FILE=config/.env      # push gateway API keys
 make oc-setup                                # configure LLM providers on VM (reads config/.env)
-make agents-validate                         # validate agent definitions
-make agents-deploy                           # deploy agents to VM (WhatsApp config included)
+make agents-validate                         # validate agent definitions locally
+make agents-plan                             # show +added / ~updated / -removed on VM
+make agents-apply                            # deploy agents + remove orphaned workspaces
 make agents-list                             # list discovered agents
 make agent-whatsapp-link AGENT=<id>          # link WhatsApp for a specific agent
 make test                                    # run all tests

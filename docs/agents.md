@@ -17,15 +17,13 @@ personality, and secrets.
 │  config/           Gateway-level config (.env for LLM API keys) │
 │                                                                 │
 │  agents/                                                        │
-│  ├── johndoe/     Sample agent definition                       │
-│  │   ├── agent.json   Config (identity, model, WhatsApp, binds) │
-│  │   ├── SOUL.md      Personality and behaviour rules           │
-│  │   ├── IDENTITY.md  Public-facing identity                    │
-│  │   ├── env.template Secret template (WA number, allowlists)   │
-│  │   ├── .env         Actual secrets (gitignored)               │
-│  │   └── workspace/   Initial data files (gitignored)           │
-│  └── my-agent/    Another agent definition                      │
-│      └── ...                                                    │
+│  └── johndoe/       Sample agent (copy to create your own)      │
+│      ├── agent.json   Config (identity, model, WhatsApp, binds) │
+│      ├── SOUL.md      Personality and behaviour rules           │
+│      ├── IDENTITY.md  Public-facing identity                    │
+│      ├── env.template Secret template (WA number, allowlists)   │
+│      ├── .env         Actual secrets (gitignored)               │
+│      └── workspace/   Initial data files (gitignored)           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -50,27 +48,32 @@ personality, and secrets.
 Developer workstation                           GCP VM
 ─────────────────────                           ──────
 
+0. make vm-provision  (once after VM creation)
+   └── Install Python venv + packages        ──►  /home/openclaw/venv/
+
 1. make agents-validate
    ├── Check agent.json syntax + WhatsApp schema
    ├── Check required files
    ├── Check field consistency
    └── Detect duplicate WhatsApp accounts
 
-2. make agents-deploy
+2. make agents-plan
+   └── Diff local agents/ vs VM openclaw.json     (shows +add / ~update / -remove)
+
+3. make agents-apply
    ├── For each agent:
    │   ├── Read agent.json + .env
    │   ├── Upload SOUL.md, IDENTITY.md       ──►  ~/.openclaw/workspace-<id>/
    │   └── Upload workspace data             ──►  ~/.openclaw/workspace-<id>/
    │
-   ├── Build merged config patch
-   │   ├── agents.list[]                      (per-agent identity + mentions)
-   │   ├── bindings[]                         (per-agent WhatsApp account routing)
-   │   └── channels.whatsapp.accounts{}       (per-agent DM/group policies)
+   ├── Build config patch (agents.list, bindings,
+   │   channels.whatsapp.accounts — replaced cleanly)
    │
-   └── Apply patch to openclaw.json          ──►  ~/.openclaw/openclaw.json
-       └── Restart OpenClaw
+   ├── Apply patch to openclaw.json          ──►  ~/.openclaw/openclaw.json
+   ├── Restart OpenClaw
+   └── Remove orphaned workspace-* dirs
 
-3. make agent-whatsapp-link AGENT=<id>
+4. make agent-whatsapp-link AGENT=<id>
    └── Link WhatsApp for specific agent      ──►  QR scan with agent's phone
 ```
 
@@ -86,21 +89,19 @@ After deployment, the VM filesystem looks like:
     ├── openclaw.json               # Merged config (agents + bindings + WhatsApp accounts)
     ├── credentials/
     │   └── whatsapp/
-    │       └── johndoe/            # John Doe WhatsApp credentials
-    ├── workspace-johndoe/          # John Doe workspace
-    │   ├── SOUL.md
-    │   ├── IDENTITY.md
-    │   └── ...
-    └── workspace-another-agent/    # Another agent workspace
+    │       └── johndoe/             # Per-agent WhatsApp credentials
+    └── workspace-johndoe/           # Per-agent workspace
         ├── SOUL.md
         ├── IDENTITY.md
-        └── ...
+        └── ...                      # (one workspace-<id>/ per agent)
 ```
 
 ## Agent Configuration Merging
 
-The deploy script builds a JSON patch from all agent definitions and deep-merges
-it into the existing `openclaw.json`. Example output:
+The deploy script builds a JSON patch from all agent definitions and applies it
+to `openclaw.json`. Arrays (`agents.list`, `bindings`) and the WhatsApp accounts
+object are **replaced** — not merged — so renamed or removed agents leave no
+orphan entries. Example output:
 
 ```json
 {
@@ -108,40 +109,25 @@ it into the existing `openclaw.json`. Example output:
     "list": [
       {
         "id": "johndoe",
-        "identity": { "name": "John Doe", "emoji": "🤖" },
+        "identity": { "name": "John Doe", "emoji": "👤" },
         "workspace": "~/.openclaw/workspace-johndoe",
-        "model": "anthropic/claude-sonnet-4-5",
+        "model": "moonshot/kimi-k2.5",
         "groupChat": { "mentionPatterns": ["JohnDoe", "@JohnDoe"] }
-      },
-      {
-        "id": "my-agent",
-        "identity": { "name": "My Agent", "emoji": "🔧" },
-        "workspace": "~/.openclaw/workspace-my-agent",
-        "model": "anthropic/claude-sonnet-4-5",
-        "groupChat": { "mentionPatterns": ["MyAgent", "@MyAgent"] }
       }
     ]
   },
   "bindings": [
-    { "agentId": "johndoe", "match": { "channel": "whatsapp", "accountId": "johndoe" } },
-    { "agentId": "my-agent", "match": { "channel": "whatsapp", "accountId": "my-agent" } }
+    { "agentId": "johndoe", "match": { "channel": "whatsapp", "accountId": "johndoe" } }
   ],
   "channels": {
     "whatsapp": {
       "accounts": {
         "johndoe": {
           "dmPolicy": "allowlist",
-          "allowFrom": ["+4911111111"],
+          "allowFrom": ["+4915112345678"],
           "selfChatMode": true,
           "groupPolicy": "allowlist",
-          "groupAllowFrom": ["+492222222"]
-        },
-        "my-agent": {
-          "dmPolicy": "allowlist",
-          "allowFrom": ["+4917612345678"],
-          "selfChatMode": true,
-          "groupPolicy": "allowlist",
-          "groupAllowFrom": ["+4917612345678"]
+          "groupAllowFrom": ["+4915112345678"]
         }
       }
     }

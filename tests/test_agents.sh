@@ -188,7 +188,7 @@ else
   fail "docs/agents.md missing"
 fi
 
-# Test 10: Sample agent is defined
+# Test 10: Sample agent johndoe is defined
 if [ -f "${REPO_ROOT}/agents/johndoe/agent.json" ]; then
   pass "johndoe sample agent defined"
 else
@@ -215,11 +215,39 @@ else
   fail "${duplicates} duplicate WhatsApp account(s) found"
 fi
 
-# Test 12: Sample agent workspace has .gitkeep
-if [ -f "${REPO_ROOT}/agents/johndoe/workspace/.gitkeep" ]; then
-  pass "agents/johndoe/workspace/.gitkeep exists"
+# Test 12: johndoe sample agent has required workspace files
+for file in \
+  johndoe/env.template \
+  johndoe/SOUL.md \
+  johndoe/IDENTITY.md; do
+  if [ -f "${REPO_ROOT}/agents/${file}" ]; then
+    pass "agents/${file} exists"
+  else
+    fail "agents/${file} missing"
+  fi
+done
+
+# Test 13: johndoe agent.json has required fields
+if jq -e '.id and .identity.name and .model' "${REPO_ROOT}/agents/johndoe/agent.json" >/dev/null 2>&1; then
+  pass "johndoe agent.json has required fields (id, identity.name, model)"
 else
-  fail "agents/johndoe/workspace/.gitkeep missing"
+  fail "johndoe agent.json missing required fields"
+fi
+
+# Test 14: johndoe SOUL.md is non-empty and non-trivial
+soul="${REPO_ROOT}/agents/johndoe/SOUL.md"
+if [ -f "$soul" ] && [ "$(wc -c < "$soul")" -gt 100 ]; then
+  pass "johndoe SOUL.md exists and has content"
+else
+  fail "johndoe SOUL.md missing or too short"
+fi
+
+# Test 15: johndoe env.template documents WhatsApp variables
+if grep -q "WHATSAPP_NUMBER" "${REPO_ROOT}/agents/johndoe/env.template" && \
+   grep -q "WHATSAPP_ALLOW_FROM" "${REPO_ROOT}/agents/johndoe/env.template"; then
+  pass "johndoe env.template documents WhatsApp variables"
+else
+  fail "johndoe env.template missing WhatsApp variable documentation"
 fi
 
 # Summary

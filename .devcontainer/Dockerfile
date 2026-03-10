@@ -6,7 +6,7 @@ ARG TERRAFORM_VERSION=1.14.6
 RUN apt-get update \
     #
     # Install common utilities
-    && apt-get install -y make jq shellcheck unzip curl \
+    && apt-get install -y make jq shellcheck unzip curl python3-pip \
     #
     # Install gcloud CLI
     && apt-get install -y apt-transport-https ca-certificates gnupg \
@@ -25,5 +25,10 @@ RUN apt-get update \
     # Clean up
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages for agent scripts
+COPY .devcontainer/requirements.txt /tmp/requirements.txt
+RUN pip3 install --break-system-packages -r /tmp/requirements.txt \
+    && rm /tmp/requirements.txt
 
 WORKDIR ${APP_FOLDER}

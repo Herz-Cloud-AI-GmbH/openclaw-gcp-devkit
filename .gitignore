@@ -33,6 +33,15 @@ agents/*/workspace/*
 !agents/*/workspace/.gitkeep
 !agents/*/workspace/*-example*
 !agents/*/workspace/*.md
+!agents/*/workspace/skills/
+!agents/*/workspace/failures/
+!agents/*/workspace/learnings/
+!agents/*/workspace/pipelines/
+!agents/*/workspace/projects/
+
+# Python bytecode
+__pycache__/
+*.pyc
 
 # Temporary
 tmp/

@@ -90,7 +90,8 @@ Pre-installs Terraform, gcloud, make, jq, and ShellCheck. Docker is not required
 
 | File | Purpose |
 |------|---------|
-| `scripts/startup.sh` | VM startup script — installs Docker, pulls OpenClaw, starts container |
+| `scripts/startup.sh` | VM startup script — installs Docker, pulls OpenClaw, starts container (runs once) |
+| `scripts/provision.sh` | Installs Python venv and agent tooling on the VM (idempotent, via `make vm-provision`) |
 | `scripts/check-prerequisites.sh` | Validates local tool prerequisites |
 | `scripts/setup-providers.sh` | Configures LLM providers on the VM |
 | `scripts/validate-agents.sh` | Validates agent definitions locally |

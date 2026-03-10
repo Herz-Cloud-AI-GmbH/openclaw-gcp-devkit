@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Startup script for the OpenClaw GCP Compute Engine instance.
-# This script runs as root on first boot via metadata_startup_script.
+# This script runs as root on FIRST BOOT ONLY via metadata_startup_script.
+#
+# Responsibility: bring the VM to a running OpenClaw state.
+# NOTHING else. Tooling (Python, venv, packages) lives in provision.sh
+# and is managed separately via `make vm-provision` — no VM recreation needed.
 set -euo pipefail
 
 OPENCLAW_USER="openclaw"
@@ -11,7 +15,7 @@ LOG_FILE="/var/log/openclaw-startup.log"
 log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $*" | tee -a "$LOG_FILE"; }
 
 # ------------------------------------------------------------------
-# 1. System packages + Docker CE from official repo
+# 1. Minimal system packages + Docker CE from official repo
 # ------------------------------------------------------------------
 log "Installing base dependencies..."
 apt-get update -qq
@@ -147,3 +151,4 @@ docker run --rm \
 docker restart openclaw 2>/dev/null || true
 
 log "Startup complete. OpenClaw is running on 127.0.0.1:18789"
+log "Next step: run 'make vm-provision' from your dev container to install Python and agent tooling."

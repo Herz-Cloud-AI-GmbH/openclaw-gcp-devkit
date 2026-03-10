@@ -35,7 +35,7 @@ cp config/env.template config/.env
 # Edit config/.env — uncomment and fill in your provider key
 ```
 
-Supported providers: **Anthropic Claude** (recommended), OpenAI, Google Gemini, KIMI K2.5 (Moonshot), GitHub Copilot.
+Supported providers: Anthropic Claude, OpenAI, Google Gemini, KIMI K2.5 (Moonshot), GitHub Copilot.
 
 > `OPENCLAW_GATEWAY_TOKEN` and `GOG_KEYRING_PASSWORD` are auto-generated on the VM. Only set them in `config/.env` if you want to override the defaults.
 
@@ -47,10 +47,10 @@ Each agent has its own directory under `agents/`. Configure WhatsApp and secrets
 # For each agent (e.g. johndoe):
 cp agents/johndoe/env.template agents/johndoe/.env
 # Edit agents/johndoe/.env:
-#   WHATSAPP_NUMBER=+4911111111
-#   WHATSAPP_ALLOW_FROM=+492222222
+#   WHATSAPP_NUMBER=+4915112345678
+#   WHATSAPP_ALLOW_FROM=+4917612345678,+4915198765432
 #   WHATSAPP_GROUPS=120363424282127706@g.us
-#   WHATSAPP_GROUP_ALLOW_FROM=+492222222
+#   WHATSAPP_GROUP_ALLOW_FROM=+4917612345678
 
 # Validate all agents
 make agents-validate
@@ -66,6 +66,9 @@ make bootstrap   # Create GCS bucket for remote state (one-time)
 make tf-init     # Initialise Terraform
 make tf-plan     # Preview changes
 make tf-apply    # Deploy to GCP (~2 min for VM + startup script)
+
+# Install Python + agent tooling on the VM (run once after VM creation)
+make vm-provision
 ```
 
 ### 5. Upload Config & Deploy Agents
@@ -78,8 +81,9 @@ make oc-restart
 # Configure LLM providers (Moonshot/KIMI if using)
 make oc-setup
 
-# Deploy all agents (validates, uploads SOUL.md/workspace, merges config)
-make agents-deploy
+# Preview what will change, then apply
+make agents-plan    # shows +added / ~updated / -removed
+make agents-apply   # deploys all agents + removes orphaned workspaces
 ```
 
 ### 6. Link WhatsApp for Each Agent
@@ -87,7 +91,8 @@ make agents-deploy
 Each agent has its own WhatsApp account. Link them one at a time:
 
 ```bash
-make agent-whatsapp-link AGENT=johndoe    # Scan QR with the agent's phone
+make agent-whatsapp-link AGENT=johndoe   # Scan QR with the agent's phone
+# Repeat for each agent in agents/
 ```
 
 ### 7. Access the Control UI
@@ -138,6 +143,7 @@ With the tunnel running and the Control UI open:
 | `make vm-stop` | Stop the VM (saves compute cost; disk persists) |
 | `make vm-ssh` | SSH into the VM (via IAP) |
 | `make vm-tunnel` | IAP SSH tunnel — forwards localhost:18789 to the VM |
+| `make vm-provision` | Install/update Python venv + agent tooling on the VM (idempotent) |
 | **OpenClaw (oc-)** | |
 | `make oc-cli` | Interactive TUI terminal chat |
 | `make oc-status` | Show OpenClaw container status |
@@ -147,8 +153,10 @@ With the tunnel running and the Control UI open:
 | `make oc-upload-env ENV_FILE=config/.env` | Upload gateway .env (API keys) to the VM |
 | `make oc-setup` | Configure LLM providers on VM (reads `config/.env`) |
 | **Agents** | |
-| `make agents-validate` | Validate all agent definitions locally |
-| `make agents-deploy` | Deploy all agents to the VM (validate + upload + merge config + restart) |
+| `make agents-validate` | Validate agent definitions locally (no VM required) |
+| `make agents-plan` | Show what will be added, updated, or removed on the VM |
+| `make agents-apply` | Deploy all agents + remove orphaned workspaces |
+| `make agents-deploy` | Alias for `agents-apply` (backwards compatibility) |
 | `make agents-list` | List discovered agents with WhatsApp accounts |
 | `make agent-whatsapp-link AGENT=<id>` | Link WhatsApp for a specific agent (interactive QR scan) |
 | **Dev** | |
@@ -197,13 +205,13 @@ Each agent's WhatsApp setup is split between `agent.json` (policies) and `.env` 
 
 **.env** — phone number and allowlists:
 ```bash
-WHATSAPP_NUMBER=+4911111111
-WHATSAPP_ALLOW_FROM=+492222222
+WHATSAPP_NUMBER=+4915112345678
+WHATSAPP_ALLOW_FROM=+4917612345678,+4915198765432
 WHATSAPP_GROUPS=120363424282127706@g.us
-WHATSAPP_GROUP_ALLOW_FROM=+492222222
+WHATSAPP_GROUP_ALLOW_FROM=+4917612345678
 ```
 
-The deploy script (`make agents-deploy`) reads both files and generates the proper OpenClaw multi-account WhatsApp configuration with per-agent bindings.
+`make agents-apply` reads both files and generates the proper OpenClaw multi-account WhatsApp configuration with per-agent bindings.
 
 ### Gateway vs Agent Configuration
 
@@ -231,7 +239,7 @@ The deploy script (`make agents-deploy`) reads both files and generates the prop
    {
      "id": "my-agent",
      "identity": { "name": "My Agent", "emoji": "🤖" },
-     "model": { "primary": "anthropic/claude-sonnet-4-5" },
+     "model": { "primary": "moonshot/kimi-k2.5" },
      "whatsapp": {
        "account": "my-agent",
        "dmPolicy": "allowlist",
@@ -250,7 +258,8 @@ The deploy script (`make agents-deploy`) reads both files and generates the prop
 5. **Validate and deploy:**
    ```bash
    make agents-validate
-   make agents-deploy
+   make agents-plan
+   make agents-apply
    make agent-whatsapp-link AGENT=my-agent
    ```
 

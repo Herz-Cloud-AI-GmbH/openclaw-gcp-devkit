@@ -98,7 +98,13 @@ tf-output: ## Show Terraform outputs (name, zone)
 # ---------------------------------------------------------------
 # VM lifecycle (vm-)
 # ---------------------------------------------------------------
-.PHONY: vm-start vm-stop vm-ssh vm-tunnel
+.PHONY: vm-start vm-stop vm-ssh vm-tunnel vm-provision
+vm-provision: ## Install / update agent tooling on the VM (Python, venv, packages) — idempotent, no VM recreation needed
+	@echo "Uploading provision script..."
+	$(call vm_scp,scripts/provision.sh,/tmp/provision.sh)
+	$(call vm_ssh,"sudo chmod +x /tmp/provision.sh && sudo /tmp/provision.sh && rm -f /tmp/provision.sh")
+	@echo "Provisioning complete."
+
 vm-start: ## Start the VM (if stopped)
 	gcloud compute instances start $(VM_NAME) --zone=$(VM_ZONE) --project=$(PROJECT_ID)
 	@echo "VM started. Wait ~30s for Docker/OpenClaw to come up, then: make vm-tunnel"
@@ -157,12 +163,42 @@ oc-setup: ## Configure LLM providers on the VM (reads config/.env)
 # ---------------------------------------------------------------
 # Agents
 # ---------------------------------------------------------------
-.PHONY: agents-validate agents-deploy agents-list agent-whatsapp-link
-agents-validate: ## Validate all agent definitions under agents/
+.PHONY: agents-validate agents-plan agents-apply agents-deploy agents-list agent-whatsapp-link
+
+agents-validate: ## Validate agent definitions locally (no VM required)
 	@bash scripts/validate-agents.sh
 
-agents-deploy: ## Deploy all agents to the VM (validate + upload + merge config + restart)
+agents-plan: ## Show what agents-apply will add, update, and remove on the VM
+	$(eval LOCAL  := $(shell for d in agents/*/; do [ -f "$$d/agent.json" ] && basename "$$d"; done))
+	$(eval REMOTE := $(shell $(call vm_ssh,"jq -r '.agents.list[]?.id // empty' /home/openclaw/.openclaw/openclaw.json 2>/dev/null || true") 2>/dev/null))
+	@echo ""
+	@echo "  agents-plan"
+	@echo "  ─────────────────────────────────"
+	@for id in $(LOCAL); do \
+	  if echo " $(REMOTE) " | grep -q " $$id "; then \
+	    echo "  \033[33m~ $$id\033[0m  (will be updated)"; \
+	  else \
+	    echo "  \033[32m+ $$id\033[0m  (will be added)"; \
+	  fi; \
+	done
+	@for id in $(REMOTE); do \
+	  if ! echo " $(LOCAL) " | grep -q " $$id "; then \
+	    echo "  \033[31m- $$id\033[0m  (will be removed)"; \
+	  fi; \
+	done
+	@echo "  ─────────────────────────────────"
+	@echo "  Run 'make agents-apply' to execute."
+	@echo ""
+
+agents-apply: agents-validate ## Apply: deploy all agents + remove orphaned workspaces from VM
 	@bash scripts/deploy-agents.sh
+	$(eval KNOWN := $(shell for d in agents/*/; do [ -f "$$d/agent.json" ] && echo "workspace-$$(basename $$d)"; done | tr '\n' ' '))
+	$(call vm_ssh,"for d in /home/openclaw/.openclaw/workspace-*/; do name=\$$(basename \"\$$d\"); \
+	  if ! echo ' $(KNOWN) ' | grep -q \" \$$name \"; then \
+	    echo \"  Removing orphaned workspace: \$$d\"; sudo rm -rf \"\$$d\"; \
+	  fi; done")
+
+agents-deploy: agents-apply ## Alias for agents-apply (backwards compatibility)
 
 agents-list: ## List discovered agent directories
 	@for d in agents/*/; do \
@@ -183,32 +219,18 @@ agent-whatsapp-link: ## Link WhatsApp for an agent (provide AGENT=<id>)
 	$(call vm_ssh,"cd /home/openclaw && sudo docker compose restart")
 
 # ---------------------------------------------------------------
-# Dev
-# ---------------------------------------------------------------
-.PHONY: test lint
-test: ## Run validation tests
-	@bash tests/test_terraform_validate.sh
-	@bash tests/test_scripts.sh
-	@bash tests/test_agents.sh
-	@echo "All tests passed."
-
-lint: ## Lint shell scripts with ShellCheck
-	@shellcheck scripts/*.sh tests/*.sh && echo "ShellCheck: all scripts OK"
-
-# ---------------------------------------------------------------
 # Devkit sync  (infrastructure shared with public openclaw-gcp-devkit repo)
 # agents/ is always excluded — it never leaves this private repo.
 # ---------------------------------------------------------------
 DEVKIT_REMOTE  := devkit
 DEVKIT_BRANCH  := sync/devkit
 DEVKIT_URL     := git@github.com:Herz-Cloud-AI-GmbH/openclaw-gcp-devkit.git
-# All paths that are shared with the public devkit repo (agents/ is not listed).
 DEVKIT_PATHS   := terraform/ scripts/ config/ docs/ .devcontainer/ tests/ \
                   Makefile README.md AGENTS.md LICENSE .gitignore .gitattributes
 
 .PHONY: devkit-setup devkit-push devkit-pull
 
-devkit-setup: ## One-time setup: add devkit remote and create sync/devkit branch
+devkit-setup: ## One-time: add devkit remote and create sync/devkit branch
 	@if git remote get-url $(DEVKIT_REMOTE) > /dev/null 2>&1; then \
 	  echo "Remote '$(DEVKIT_REMOTE)' already exists — skipping add."; \
 	else \
@@ -225,7 +247,7 @@ devkit-setup: ## One-time setup: add devkit remote and create sync/devkit branch
 	fi
 	@echo "Devkit setup complete. Run 'make devkit-push' or 'make devkit-pull'."
 
-devkit-push: ## Push infrastructure changes from current branch to public devkit repo (agents/ excluded)
+devkit-push: ## Push infrastructure changes to public devkit repo (agents/ always excluded)
 	@SOURCE=$$(git branch --show-current); \
 	echo "Pushing infra from '$$SOURCE' → $(DEVKIT_REMOTE)/main (agents/ excluded)..."; \
 	git checkout $(DEVKIT_BRANCH); \
@@ -239,7 +261,7 @@ devkit-push: ## Push infrastructure changes from current branch to public devkit
 	fi; \
 	git checkout $$SOURCE
 
-devkit-pull: ## Pull infrastructure updates from public devkit repo into current branch (agents/ protected)
+devkit-pull: ## Pull infrastructure updates from public devkit repo (agents/ protected)
 	@TARGET=$$(git branch --show-current); \
 	echo "Pulling infra from $(DEVKIT_REMOTE)/main → '$$TARGET' (agents/ protected)..."; \
 	git fetch $(DEVKIT_REMOTE); \
@@ -253,3 +275,16 @@ devkit-pull: ## Pull infrastructure updates from public devkit repo into current
 	  git commit -m "chore: sync infrastructure from devkit"; \
 	  echo "Merged devkit infra into '$$TARGET'. agents/ untouched."; \
 	fi
+
+# ---------------------------------------------------------------
+# Dev
+# ---------------------------------------------------------------
+.PHONY: test lint
+test: ## Run validation tests
+	@bash tests/test_terraform_validate.sh
+	@bash tests/test_scripts.sh
+	@bash tests/test_agents.sh
+	@echo "All tests passed."
+
+lint: ## Lint shell scripts with ShellCheck
+	@shellcheck scripts/*.sh tests/*.sh && echo "ShellCheck: all scripts OK"

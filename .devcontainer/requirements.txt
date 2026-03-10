@@ -1,0 +1,6 @@
+# Python packages required by agent scripts running inside the devcontainer.
+# Add new dependencies here — the Dockerfile installs this file at build time.
+
+# Used by agent skills (e.g. web scraping)
+requests==2.32.5
+beautifulsoup4==4.14.3

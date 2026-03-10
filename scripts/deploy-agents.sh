@@ -106,6 +106,7 @@ for agent_dir in "${agent_dirs[@]}"; do
   identity_name=$(jq -r '.identity.name' "$config")
   identity_emoji=$(jq -r '.identity.emoji // empty' "$config")
   model_primary=$(jq -r '.model.primary // .model // empty' "$config")
+  tools_config=$(jq -c '.tools // empty' "$config")
   workspace_host="${OPENCLAW_HOST}/workspace-${agent_id}"
   workspace_path="${OPENCLAW_CONTAINER}/workspace-${agent_id}"
 
@@ -116,13 +117,15 @@ for agent_dir in "${agent_dirs[@]}"; do
     --arg workspace "$workspace_path" \
     --arg model "$model_primary" \
     --argjson mentions "$wa_mention_patterns" \
+    --argjson tools "${tools_config:-null}" \
     '{
       id: $id,
       identity: ({ name: $name } + (if $emoji != "" then { emoji: $emoji } else {} end)),
       workspace: $workspace
     }
     + (if $model != "" then { model: $model } else {} end)
-    + (if ($mentions | length) > 0 then { groupChat: { mentionPatterns: $mentions } } else {} end)')
+    + (if ($mentions | length) > 0 then { groupChat: { mentionPatterns: $mentions } } else {} end)
+    + (if $tools != null then { tools: $tools } else {} end)')
 
   AGENTS_LIST=$(echo "$AGENTS_LIST" | jq --argjson entry "$agent_entry" '. + [$entry]')
 
@@ -243,7 +246,15 @@ echo "$PATCH" > /tmp/_agents_patch.json
 vm_scp /tmp/_agents_patch.json /tmp/_agents_patch.json
 
 vm_ssh "sudo test -f '${CONFIG_FILE}' || (echo '{}' | sudo tee '${CONFIG_FILE}' >/dev/null)"
-vm_ssh "sudo jq -s '.[0] * .[1]' '${CONFIG_FILE}' /tmp/_agents_patch.json > /tmp/_openclaw_merged.json \
+# Deep-merge the patch, but replace agents.list, bindings, and channels.whatsapp.accounts
+# entirely (not additively) so renamed/removed agents don't leave orphan entries.
+vm_ssh "sudo jq -s '
+  .[1] as \$p |
+  .[0] * \$p |
+  if \$p.channels.whatsapp.accounts then
+    .channels.whatsapp.accounts = \$p.channels.whatsapp.accounts
+  else . end
+' '${CONFIG_FILE}' /tmp/_agents_patch.json > /tmp/_openclaw_merged.json \
   && sudo mv /tmp/_openclaw_merged.json '${CONFIG_FILE}' \
   && sudo chown openclaw:openclaw '${CONFIG_FILE}' \
   && rm -f /tmp/_agents_patch.json"

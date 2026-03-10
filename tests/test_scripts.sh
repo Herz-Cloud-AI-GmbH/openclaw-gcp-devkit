@@ -138,6 +138,13 @@ else
   fail "Makefile missing agent-whatsapp-link target"
 fi
 
+# Test 18: provision.sh installs Python3 (moved from startup.sh for idempotent re-runs)
+if grep -q "python3" "${REPO_ROOT}/scripts/provision.sh"; then
+  pass "provision.sh installs python3"
+else
+  fail "provision.sh does not install python3"
+fi
+
 # Summary
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
